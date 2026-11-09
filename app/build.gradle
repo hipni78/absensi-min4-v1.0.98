@@ -1,0 +1,13 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'id.min4batanghari.absensi'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'id.min4batanghari.absensi'
+        minSdk 23
+        targetSdk 28
+        versionCode 1098
+        versionName '1.0.98'
+    }
+}
