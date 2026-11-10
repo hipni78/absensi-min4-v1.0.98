@@ -6,7 +6,6 @@ import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.webkit.ValueCallback;
@@ -22,7 +21,7 @@ public class MainActivity extends Activity {
     private Uri cameraImageUri;
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private static final int CAMERA_PERMISSION_REQUEST = 1002;
-    private WebChromeClient.FileChooserParams pendingParams;
+    private boolean pendingImageChooser = false;
 
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -40,16 +39,44 @@ public class MainActivity extends Activity {
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (uploadCallback != null) uploadCallback.onReceiveValue(null);
                 uploadCallback = callback;
-                pendingParams = params;
-                if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                    requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
+                if (acceptsImages(params)) {
+                    pendingImageChooser = true;
+                    if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
+                    } else {
+                        showImagePicker();
+                    }
                 } else {
-                    showImagePicker();
+                    // Untuk JSON, CSV, DOCX dan berkas non-gambar, ikuti tipe
+                    // yang diminta HTML; jangan paksa pemilih ke image/*.
+                    pendingImageChooser = false;
+                    showDocumentPicker(params);
                 }
                 return true;
             }
         });
         webView.loadUrl("file:///android_asset/index.html");
+    }
+
+    private boolean acceptsImages(FileChooserParams params) {
+        if (params == null || params.getAcceptTypes() == null) return false;
+        for (String type : params.getAcceptTypes()) {
+            if (type == null) continue;
+            String t = type.toLowerCase();
+            if (t.contains("image/*") || t.startsWith("image/")) return true;
+        }
+        return false;
+    }
+
+    private void showDocumentPicker(FileChooserParams params) {
+        try {
+            Intent intent = params.createIntent();
+            if (intent.getType() == null) intent.setType("*/*");
+            startActivityForResult(intent, FILE_CHOOSER_REQUEST);
+        } catch (Exception e) {
+            finishFileChooser(null);
+            Toast.makeText(this, "Tidak dapat membuka pemilih berkas: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     private void showImagePicker() {
@@ -70,20 +97,25 @@ public class MainActivity extends Activity {
                     camera.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
                 }
             }
-
             Intent chooser = Intent.createChooser(gallery, "Pilih foto atau ambil dari kamera");
             if (cameraImageUri != null) chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{camera});
             startActivityForResult(chooser, FILE_CHOOSER_REQUEST);
         } catch (Exception e) {
-            if (uploadCallback != null) uploadCallback.onReceiveValue(null);
-            uploadCallback = null;
+            finishFileChooser(null);
             Toast.makeText(this, "Tidak dapat membuka kamera/galeri: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
+    private void finishFileChooser(Uri[] uris) {
+        if (uploadCallback != null) uploadCallback.onReceiveValue(uris);
+        uploadCallback = null;
+        cameraImageUri = null;
+        pendingImageChooser = false;
+    }
+
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == CAMERA_PERMISSION_REQUEST) {
+        if (requestCode == CAMERA_PERMISSION_REQUEST && pendingImageChooser) {
             // Galeri tetap dapat digunakan walaupun izin kamera ditolak.
             showImagePicker();
         }
@@ -96,14 +128,11 @@ public class MainActivity extends Activity {
             if (resultCode == Activity.RESULT_OK) {
                 if (data != null && data.getData() != null) {
                     results = new Uri[]{data.getData()};
-                } else if (cameraImageUri != null) {
+                } else if (pendingImageChooser && cameraImageUri != null) {
                     results = new Uri[]{cameraImageUri};
                 }
             }
-            uploadCallback.onReceiveValue(results);
-            uploadCallback = null;
-            cameraImageUri = null;
-            pendingParams = null;
+            finishFileChooser(results);
         }
     }
 
