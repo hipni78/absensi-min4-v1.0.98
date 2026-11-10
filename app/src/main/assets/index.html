@@ -2,11 +2,11 @@
 <html lang="id">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#14532d">\n<meta name="app-version" content="1.0.98">
+<meta name="theme-color" content="#14532d">\n<meta name="app-version" content="1.0.101">
 <meta name="description" content="Aplikasi Absensi MIN 4 Batang Hari">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
-<title>Absensi MIN 4 Batang Hari v1.0.98 - Terhubung Google Sheets</title>
+<title>Absensi MIN 4 Batang Hari v1.0.101 - Terhubung Google Sheets</title>
 <style>
 :root{--green:#166534;--dark:#14532d;--bg:#f3f6f4;--line:#d8e2db}
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:#18251d}
@@ -1257,7 +1257,7 @@ main>section:not(.dashboard-summary):not(#menuUtamaPanel){grid-column:2;grid-row
  <p id="autoBackupStatus" class="note" role="status">Cadangan otomatis lokal sedang disiapkan…</p>
 </section>
 </section>
-</main><footer>Versi uji coba v1.0.61 HP - Logo MIN 4 diperbarui</footer>
+</main><footer>Versi uji coba v1.0.100 Android - basis stabil v1.0.101</footer>
 <script>
 const $=id=>document.getElementById(id);
 const classes=[]; for(let g=1;g<=6;g++) for(const s of ['A','B','C']) classes.push(`${g}${s}`);
@@ -1413,7 +1413,7 @@ async function syncAllData(){
   $('syncStatus').textContent='Memeriksa dan mengunggah foto…';
   const foto=await unggahFotoLokal(endpoint);
   $('syncStatus').textContent='Mengirim data utama ke Google Sheets…';
-  const payload={app:'Absensi MIN 4 Batang Hari',version:'1.0.98',students:(await all('students')).map(x=>cloudCopy('students',x)),attendance:(await all('attendance')).map(x=>cloudCopy('attendance',x)),lessons:(await all('lessons')).map(x=>cloudCopy('lessons',x)),grades:(await all('grades')).map(x=>cloudCopy('grades',x)),questions:(await all('questions')).map(x=>cloudCopy('questions',x)),gradeMeta:await all('gradeMeta'),journal:await all('journal'),guru:bacaDataGuru().map(x=>({...x,updatedAt:x.updatedAt||new Date().toISOString()}))};
+  const payload={app:'Absensi MIN 4 Batang Hari',version:'1.0.101',students:(await all('students')).map(x=>cloudCopy('students',x)),attendance:(await all('attendance')).map(x=>cloudCopy('attendance',x)),lessons:(await all('lessons')).map(x=>cloudCopy('lessons',x)),grades:(await all('grades')).map(x=>cloudCopy('grades',x)),questions:(await all('questions')).map(x=>cloudCopy('questions',x)),gradeMeta:await all('gradeMeta'),journal:await all('journal'),guru:bacaDataGuru().map(x=>({...x,updatedAt:x.updatedAt||new Date().toISOString()}))};
   await fetch(endpoint,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
   $('syncStatus').textContent=`Permintaan sinkronisasi dikirim. Bank Soal: ${payload.questions.length}, Jurnal: ${payload.journal.length}. Foto diproses: ${foto.diunggah}, gagal kirim: ${foto.gagal}. Tekan Ambil Data dari Google Sheets pada perangkat lain.`;
  }catch(e){console.error(e);$('syncStatus').textContent='Sinkronisasi belum terverifikasi: '+(e.message||e)+'. Data lokal tetap dipertahankan.'}
@@ -3210,4 +3210,23 @@ window.handleAndroidBack=function(){
 }
 </style>
 
+
+<style id="min4-zoom-style">
+#min4ZoomPanel{position:fixed;right:10px;bottom:74px;z-index:99999;display:flex;align-items:center;gap:6px;padding:7px;background:#ffffffee;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 2px 10px #0002;font:14px Arial,sans-serif}
+#min4ZoomPanel button{min-width:34px;min-height:34px;border:0;border-radius:8px;background:#176b4d;color:white;font-size:18px;font-weight:bold}
+#min4ZoomValue{min-width:44px;text-align:center;font-weight:bold;color:#243746}
+</style>
+<div id="min4ZoomPanel" aria-label="Pengaturan ukuran tampilan"><button type="button" id="min4ZoomOut" aria-label="Perkecil">−</button><span id="min4ZoomValue">100%</span><button type="button" id="min4ZoomIn" aria-label="Perbesar">+</button><button type="button" id="min4ZoomReset" aria-label="Atur ulang">↺</button></div>
+<script id="min4-zoom-script">
+(function(){
+ let level=100;
+ const value=document.getElementById('min4ZoomValue');
+ function apply(){document.documentElement.style.zoom=String(level/100);value.textContent=level+'%';try{localStorage.setItem('min4_display_zoom_v1100',String(level));}catch(e){}}
+ try{const saved=Number(localStorage.getItem('min4_display_zoom_v1100'));if(saved>=80&&saved<=140)level=saved;}catch(e){}
+ document.getElementById('min4ZoomIn').addEventListener('click',()=>{level=Math.min(140,level+10);apply();});
+ document.getElementById('min4ZoomOut').addEventListener('click',()=>{level=Math.max(80,level-10);apply();});
+ document.getElementById('min4ZoomReset').addEventListener('click',()=>{level=100;apply();});
+ apply();
+})();
+</script>
 </body></html>

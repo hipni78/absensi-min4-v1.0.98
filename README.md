@@ -1,13 +1,17 @@
-# Absensi MIN 4 Batang Hari v1.0.98
+# Absensi MIN4 Batang Hari v1.0.101
 
-Android WebView wrapper for the HTML application. The original v1.0.97 master is not modified; this project packages the v1.0.98 HTML copy.
+Proyek Android WebView untuk membangun APK melalui GitHub Actions.
 
-## Build APK on GitHub
-1. Create a new GitHub repository, for example `absensi-min4-v1.0.98`.
-2. Upload the contents of this folder to the repository root (including the hidden `.github` folder).
-3. Open **Actions** and allow workflows if GitHub asks.
-4. Run **Build Absensi MIN4 APK** using **Run workflow**, or push to `main`.
-5. When the run completes, open the run and download the artifact `Absensi-MIN4-v1.0.98-debug`.
-6. Extract `app-debug.apk` and install it on Android. This is a debug APK, not a Play Store release-signed APK.
+- applicationId: `id.min4batanghari.absensi` (dipertahankan)
+- versionName: `1.0.101`
+- versionCode: `1101`
+- HTML aplikasi: `app/src/main/assets/index.html`
+- Kamera dan galeri: ditangani oleh `MainActivity.java` melalui pemilih gambar Android.
 
-No Google password, Apps Script deployment ID, or signing key is required for this debug build. The Apps Script Web App URL is already embedded in the HTML asset.
+## Build APK
+1. Unggah isi folder proyek ini ke repositori GitHub.
+2. Buka tab Actions dan jalankan workflow `Build Absensi MIN4 APK`.
+3. Unduh artifact `Absensi-MIN4-v1.0.101-debug`.
+
+## Catatan pembaruan
+Build debug GitHub Actions dapat memakai debug signing key yang berbeda pada runner yang berbeda. APK ini belum dijamin dapat dipasang sebagai pembaruan di atas instalasi lama. Untuk pembaruan tanpa uninstall, diperlukan signing key tetap yang sama dengan APK lama. APK lama v1.0.98 tidak tersedia untuk mengambil sertifikatnya, sehingga jangan hapus aplikasi lama sebelum data dicadangkan dan strategi migrasi ditentukan.
