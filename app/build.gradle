@@ -7,7 +7,7 @@ android {
         applicationId 'id.min4batanghari.absensi'
         minSdk 23
         targetSdk 28
-        versionCode 1102
-        versionName '1.0.102'
+        versionCode 1103
+        versionName '1.0.103'
     }
 }

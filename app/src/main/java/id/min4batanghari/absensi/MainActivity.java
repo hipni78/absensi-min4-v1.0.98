@@ -4,10 +4,12 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.ClipData;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebChromeClient.FileChooserParams;
@@ -23,6 +25,8 @@ public class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private static final int CAMERA_PERMISSION_REQUEST = 1002;
     private boolean pendingImageChooser = false;
+    private boolean pendingDirectCamera = false;
+    private String requestedPickerMode = "";
 
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -36,27 +40,45 @@ public class MainActivity extends Activity {
         settings.setAllowContentAccess(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
         webView.setWebViewClient(new WebViewClient());
+        webView.addJavascriptInterface(new AndroidCameraBridge(), "AndroidCameraBridge");
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (uploadCallback != null) uploadCallback.onReceiveValue(null);
                 uploadCallback = callback;
-                if (acceptsImages(params)) {
-                    pendingImageChooser = true;
+                if (!acceptsImages(params)) {
+                    pendingImageChooser = false;
+                    showDocumentPicker(params);
+                    return true;
+                }
+                pendingImageChooser = true;
+                pendingDirectCamera = "camera".equals(requestedPickerMode) || (params != null && params.isCaptureEnabled());
+                boolean directGallery = "gallery".equals(requestedPickerMode);
+                requestedPickerMode = "";
+                if (directGallery) {
+                    showGalleryOnly();
+                } else if (pendingDirectCamera) {
                     if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                         requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
                     } else {
-                        showImagePicker();
+                        showCameraOnly();
                     }
+                } else if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
                 } else {
-                    // Untuk JSON, CSV, DOCX dan berkas non-gambar, ikuti tipe
-                    // yang diminta HTML; jangan paksa pemilih ke image/*.
-                    pendingImageChooser = false;
-                    showDocumentPicker(params);
+                    showImagePicker();
                 }
                 return true;
             }
         });
         webView.loadUrl("file:///android_asset/index.html");
+    }
+
+    public class AndroidCameraBridge {
+        @JavascriptInterface
+        public void setPickerMode(String mode) {
+            if ("camera".equals(mode) || "gallery".equals(mode)) requestedPickerMode = mode;
+            else requestedPickerMode = "";
+        }
     }
 
     private boolean acceptsImages(FileChooserParams params) {
@@ -80,12 +102,47 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void showGalleryOnly() {
+        try {
+            Intent gallery = new Intent(Intent.ACTION_GET_CONTENT);
+            gallery.addCategory(Intent.CATEGORY_OPENABLE);
+            gallery.setType("image/*");
+            startActivityForResult(Intent.createChooser(gallery, "Pilih foto dari galeri"), FILE_CHOOSER_REQUEST);
+        } catch (Exception e) {
+            finishFileChooser(null);
+            Toast.makeText(this, "Tidak dapat membuka galeri: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void showCameraOnly() {
+        try {
+            Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            if (camera.resolveActivity(getPackageManager()) == null) {
+                finishFileChooser(null);
+                Toast.makeText(this, "Kamera tidak tersedia pada perangkat ini", Toast.LENGTH_LONG).show();
+                return;
+            }
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Images.Media.DISPLAY_NAME, "MIN4_KAMERA_" + System.currentTimeMillis() + ".jpg");
+            values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            cameraImageUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+            if (cameraImageUri != null) {
+                camera.putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri);
+                camera.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                camera.setClipData(ClipData.newRawUri("Foto MIN4", cameraImageUri));
+            }
+            startActivityForResult(camera, FILE_CHOOSER_REQUEST);
+        } catch (Exception e) {
+            finishFileChooser(null);
+            Toast.makeText(this, "Tidak dapat membuka kamera: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void showImagePicker() {
         try {
             Intent gallery = new Intent(Intent.ACTION_GET_CONTENT);
             gallery.addCategory(Intent.CATEGORY_OPENABLE);
             gallery.setType("image/*");
-
             Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
             cameraImageUri = null;
             if (camera.resolveActivity(getPackageManager()) != null) {
@@ -96,6 +153,7 @@ public class MainActivity extends Activity {
                 if (cameraImageUri != null) {
                     camera.putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri);
                     camera.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    camera.setClipData(ClipData.newRawUri("Foto MIN4", cameraImageUri));
                 }
             }
             Intent chooser = Intent.createChooser(gallery, "Pilih foto atau ambil dari kamera");
@@ -112,13 +170,19 @@ public class MainActivity extends Activity {
         uploadCallback = null;
         cameraImageUri = null;
         pendingImageChooser = false;
+        pendingDirectCamera = false;
+        requestedPickerMode = "";
     }
 
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == CAMERA_PERMISSION_REQUEST && pendingImageChooser) {
-            // Galeri tetap dapat digunakan walaupun izin kamera ditolak.
-            showImagePicker();
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (pendingDirectCamera) showCameraOnly(); else showImagePicker();
+            } else {
+                finishFileChooser(null);
+                Toast.makeText(this, "Izin kamera diperlukan untuk mengambil foto", Toast.LENGTH_LONG).show();
+            }
         }
     }
 
@@ -127,11 +191,8 @@ public class MainActivity extends Activity {
         if (requestCode == FILE_CHOOSER_REQUEST && uploadCallback != null) {
             Uri[] results = null;
             if (resultCode == Activity.RESULT_OK) {
-                if (data != null && data.getData() != null) {
-                    results = new Uri[]{data.getData()};
-                } else if (pendingImageChooser && cameraImageUri != null) {
-                    results = new Uri[]{cameraImageUri};
-                }
+                if (data != null && data.getData() != null) results = new Uri[]{data.getData()};
+                else if (pendingImageChooser && cameraImageUri != null) results = new Uri[]{cameraImageUri};
             }
             finishFileChooser(results);
         }
